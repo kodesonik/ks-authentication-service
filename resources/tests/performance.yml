@@ -1,0 +1,10 @@
+config:
+  target: 'http://localhost' # Remplacez ceci par l'URL de votre backend
+  phases:
+    - duration: 60 # Durée du test en secondes
+      arrivalRate: 10 # Nombre de nouvelles connexions virtuelles par seconde
+
+scenarios:
+  - flow:
+      - get:
+          url: "/" # Remplacez ceci par l'endpoint que vous souhaitez tester

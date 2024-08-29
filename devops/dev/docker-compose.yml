@@ -1,0 +1,20 @@
+name: tz
+services:
+# App 
+  authentication-service:
+    container_name: tz-authentication-service
+    build:
+      context: ../..
+      dockerfile: ./devops/dev/Dockerfile
+      target: development
+    env_file:
+      - .env
+    volumes:
+      # - ../../node_modules:/usr/src/app/node_modules
+      - ../../src:/usr/src/app/src
+      # - /usr/src/app/node_modules
+    ports:
+      - "3001"
+    environment:
+      NODE_ENV: development
+    command: npm run start:dev

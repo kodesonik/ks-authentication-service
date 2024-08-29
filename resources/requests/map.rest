@@ -1,0 +1,13 @@
+
+GET http://localhost:3000/api/v1
+
+### Docs
+GET http://localhost:3000/api
+
+### Place near by search
+GET http://localhost/api/v1/place/nearbysearch?location=6.121968479273252,1.210810540179678
+
+### Get place by id
+GET http://localhost/api/v1/place/ChIJ21xjit1fIRARAANLU_e46aY
+### Place autocomplete search
+GET http://localhost/api/v1/place/autocomplete?input=BC&components=country:tg

@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  nest_app:
+    # container_name: nestjs_app_prod
+    image: bkgspeed/localisation-service:main
+    ports:
+      - '3005'
+    env_file:
+      - .env
+    # 4 instances of the app
+    deploy:
+      replicas: 2
+      restart_policy:
+        condition: on-failure
+    
+
+# MongoDB with username and password
+  mongo_db:
+    container_name: mongo_db
+    image: mongo
+    # restart: always
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: root
+      # MONGO_INITDB_ROOT_DATABASE: db
+    volumes:
+      - ./data/mongo:/data/db
+
+# Redis Db with username and password
+  redis_db:
+    container_name: redis_db
+    image: redis
+    # restart: always
+    ports:
+      - "6379:6379"
+    command: 'redis-server --requirepass root'
+    volumes:
+      - ./data/redis:/data
+
+# Proxy
+  nginx_proxy:
+    container_name: nginx_proxy
+    image: nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./data/nginx/default.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - nest_app
+      - mongo_db
+      - redis_db
+
+
