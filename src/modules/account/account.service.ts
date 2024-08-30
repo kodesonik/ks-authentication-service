@@ -112,6 +112,8 @@ export class AccountService {
   //register
   async register(registerDto: RegisterDto) {
     try {
+      // if no username provided
+      if (!registerDto.username) registerDto.username = registerDto.email;
       //Check if the user email provide is unique
       const isEmailUnique = await this.isEmailUnique(registerDto.email);
       if (!isEmailUnique) {
