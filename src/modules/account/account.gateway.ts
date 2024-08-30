@@ -52,7 +52,7 @@ export class AccountGateway {
     if (!otp) {
       return { error: 'OTP is required', status: 400 };
     }
-    return this.accountService.confirmAccount(user._id, otp);
+    return this.accountService.confirmAccount(user.id, otp);
   }
 
   //login

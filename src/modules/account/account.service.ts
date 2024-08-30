@@ -146,7 +146,7 @@ export class AccountService {
       // generate tokens
       const { _id, ...rest } = account.toObject();
       const access_token = await this.generateToken(
-        { id: _id, _id, rest },
+        { id: _id, _id, ...rest },
         'temporary',
       );
       // const refresh_token = await this.generateToken(
@@ -211,7 +211,7 @@ export class AccountService {
       );
 
       const refresh_token = await this.generateToken(
-        { id: _id, _id, rest, isActive: true },
+        { id: _id, _id, ...rest, isActive: true },
         'refresh',
       );
       return {
@@ -242,11 +242,11 @@ export class AccountService {
       // generate tokens
       const { _id, ...rest } = account.toObject();
       const access_token = await this.generateToken(
-        { id: _id, _id, rest },
+        { id: _id, _id, ...rest },
         'access',
       );
       const refresh_token = await this.generateToken(
-        { id: _id, _id, rest },
+        { id: _id, _id, ...rest },
         'refresh',
       );
       // save tokens in redis
