@@ -261,6 +261,7 @@ export class AccountService {
     }
   }
 
+  //logout
   async logout(token: string) {
     try {
       // Check if token exist
@@ -280,6 +281,8 @@ export class AccountService {
       return { error: error.message, status: error.status };
     }
   }
+
+  //change password
 
   //old endopoints
 
@@ -493,29 +496,19 @@ export class AccountService {
       updateAccountDto['avatar'] = createAccountDto.avatar;
     if (account.defaultUsername && createAccountDto.username)
       updateAccountDto['username'] = createAccountDto.username;
-
+    if (createAccountDto.firstname)
+      updateAccountDto['firstname'] = createAccountDto.firstname;
+    if (createAccountDto.lastname)
+      updateAccountDto['lastname'] = createAccountDto.lastname;
+    if (createAccountDto.birthdate)
+      updateAccountDto['birthdate'] = createAccountDto.birthdate;
+    if (createAccountDto.interests)
+      updateAccountDto['interests'] = createAccountDto.interests;
     await account.updateOne(updateAccountDto);
     return { message: 'profile completed' };
   }
 
-  findAll() {
-    return `This action returns all account`;
-  }
-
-  findOne(id: number) {
-    return `This action returns a #${id} account`;
-  }
-
-  update(id: number, updateAccountDto: UpdateAccountDto) {
-    return `This action updates a #${id} account`;
-  }
-
-  remove(id: number) {
-    return `This action removes a #${id} account`;
-  }
-
   //Backup user from old database
-
   async backupUser(credential: string, role?: Role) {
     const user = await firstValueFrom(
       this.backupService.send({ cmd: 'find-user' }, { credential, role }),

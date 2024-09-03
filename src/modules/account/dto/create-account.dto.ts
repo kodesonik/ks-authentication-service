@@ -1,3 +1,5 @@
+import { Role } from 'src/models';
+
 export class CreateAccountDto {
   email?: string;
   phoneNumber?: string;
@@ -5,4 +7,5 @@ export class CreateAccountDto {
   lastname: string;
   birthdate: string;
   gender: string;
+  role: Role;
 }
