@@ -1,16 +1,6 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  Patch,
-  Param,
-  Delete,
-  Request,
-} from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Request } from '@nestjs/common';
 import { AccountService } from './account.service';
 import { CreateAccountDto } from './dto/create-account.dto';
-import { UpdateAccountDto } from './dto/update-account.dto';
 import { ApiBody, ApiHeader, ApiParam, ApiTags } from '@nestjs/swagger';
 import { SendOtpDto } from './dto/send-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
@@ -186,58 +176,5 @@ export class AccountController {
   completeProfile(@Request() req, @Body() createAccountDto: CreateAccountDto) {
     const { id } = req?.user ?? {};
     return this.accountService.completeProfile(id, createAccountDto);
-  }
-
-  @Post('check-username')
-  checkUsername(@Body() createAccountDto: CreateAccountDto) {
-    // return this.accountService.create(createAccountDto);
-  }
-
-  @Post('')
-  signup(@Body() createAccountDto: CreateAccountDto) {
-    // return this.accountService.create(createAccountDto);
-  }
-
-  @Get()
-  getAccounts() {
-    return this.accountService.findAll();
-  }
-
-  @Get(':id')
-  getAccount(@Param('id') id: string) {
-    return this.accountService.findOne(+id);
-  }
-
-  @Post('login')
-  login(@Body() createAccountDto: CreateAccountDto) {
-    // return this.accountService.create(createAccountDto);
-  }
-
-  @Post('forgot-password')
-  forgotPassword(@Body() createAccountDto: CreateAccountDto) {
-    // return this.accountService.create(createAccountDto);
-  }
-
-  @Post('reset-password')
-  resetPassword(@Body() createAccountDto: CreateAccountDto) {
-    // return this.accountService.create(createAccountDto);
-  }
-
-  @Post('change-password')
-  changePassword(@Body() createAccountDto: CreateAccountDto) {
-    // return this.accountService.create(createAccountDto);
-  }
-
-  @Patch(':id')
-  updateCredentials(
-    @Param('id') id: string,
-    @Body() updateAccountDto: UpdateAccountDto,
-  ) {
-    return this.accountService.update(+id, updateAccountDto);
-  }
-
-  @Delete(':id')
-  deleteAccount(@Param('id') id: string) {
-    return this.accountService.remove(+id);
   }
 }

@@ -50,4 +50,11 @@ export default () => ({
     },
     transport: Transport.TCP,
   },
+  root: {
+    lastname: process.env.ROOT_LASTNAME,
+    firstname: process.env.ROOT_FIRSTNAME,
+    username: process.env.ROOT_USERNAME,
+    email: process.env.ROOT_EMAIL,
+    phone: parseInt(process.env.ROOT_PHONE, 10),
+  },
 });

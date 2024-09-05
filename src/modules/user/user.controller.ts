@@ -15,21 +15,21 @@ export class UserController {
 
   @MessagePattern('findAllUser')
   findAll() {
-    return this.userService.findAll();
+    // return this.userService.findAll();
   }
 
   @MessagePattern('findOneUser')
   findOne(@Payload() id: number) {
-    return this.userService.findOne(id);
+    // return this.userService.findOne(id);
   }
 
   @MessagePattern('updateUser')
   update(@Payload() updateUserDto: UpdateUserDto) {
-    return this.userService.update(updateUserDto.id, updateUserDto);
+    // return this.userService.update(updateUserDto.id, updateUserDto);
   }
 
   @MessagePattern('removeUser')
   remove(@Payload() id: number) {
-    return this.userService.remove(id);
+    // return this.userService.remove(id);
   }
 }

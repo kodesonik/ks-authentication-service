@@ -6,10 +6,10 @@ import {
   Injectable,
   InternalServerErrorException,
   Logger,
+  NotFoundException,
   // NotFoundException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
-import { UpdateAccountDto } from './dto/update-account.dto';
 import { InjectModel } from '@nestjs/mongoose';
 import { Account } from './entities/account.schema';
 import { Model } from 'mongoose';
@@ -228,7 +228,7 @@ export class AccountService {
     }
   }
 
-  //login
+  // login
   async login(loginDto: LoginDto) {
     try {
       // find account with username or email
@@ -261,7 +261,7 @@ export class AccountService {
     }
   }
 
-  //logout
+  // logout
   async logout(token: string) {
     try {
       // Check if token exist
@@ -282,10 +282,79 @@ export class AccountService {
     }
   }
 
-  //change password
+  // change username
+  async changeUsername(id: string, username: string) {
+    // check if new username is unique
+    const isUsernameUnique = await this.isUsernameUnique(username);
+    if (!isUsernameUnique) {
+      throw new BadRequestException('Username already exist');
+    }
+    // update username
+    await this.accountModel.updateOne({ _id: id }, { username });
+    return { message: 'Username changed' };
+  }
 
-  //old endopoints
+  // change email
+  async changeEmail(id: string, email: string) {
+    // check if email is unique
+    const isEmailUnique = await this.isEmailUnique(email);
+    if (!isEmailUnique) {
+      throw new BadRequestException('Email already exist');
+    }
+    // Generate otp
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    // send otp on new email
+    this.redisService.set(email, otp, 10);
+    const res = await firstValueFrom(
+      this.messagingService.send(
+        { cmd: 'send-mail-otp' },
+        {
+          to: email,
+          otp,
+        },
+      ),
+    );
+    console.log('res', res);
+    return { message: 'Email changed' };
+  }
 
+  async confirmChangeEmail(credential: string, otp: string) {
+    // verify otp
+    const savedOtp = await this.redisService.get(credential);
+    if (!savedOtp) throw new BadRequestException('otp expired');
+    if (savedOtp !== otp) throw new BadRequestException('invalid otp');
+    // update email in redis
+    await this.accountModel.updateOne(
+      { email: credential },
+      { email: credential },
+    );
+    return { message: 'Email changed' };
+  }
+
+  // forgot password
+  async forgotPassword(credential: string) {
+    // check if account with credential exist
+    
+    // generate otp
+    // generate token
+    // save otp and token in cache
+    // send otp to user
+  }
+
+  // reset password
+  async resetPassword(credential: string, password: string) {
+    // check if account with credential exist
+    // generate hash
+    // update password
+  }
+
+  // change password
+  async changePassword(id: string, oldPassword: string, newPassword: string) {
+    // check if old password is valid
+    // hash and save new password
+  }
+
+  // send otp
   async sendOtp(credential: string, resend: boolean) {
     try {
       // generate otp 6 digit
@@ -421,7 +490,7 @@ export class AccountService {
     // if (!device.isActive) throw new ForbiddenException('device not active');
 
     // Check if account is active
-    const decripted = this.jwtService.verify(refresh_token);
+    const decripted = await this.decriptToken(refresh_token, 'refresh');
     if (!decripted) throw new BadRequestException('account not found');
     const account = await this.accountModel.findById(decripted.id);
     if (!account) throw new BadRequestException('account not found');
@@ -429,11 +498,9 @@ export class AccountService {
 
     // Generate new tokens
     const { _id, ...rest } = account.toObject();
-    const access_token = await this.jwtService.signAsync(
-      { id: _id, ...rest },
-      {
-        expiresIn: '10m',
-      },
+    const access_token = await this.generateToken(
+      { id: _id, _id, ...rest },
+      'access',
     );
 
     // save access token in redis
@@ -529,5 +596,68 @@ export class AccountService {
       interests: user.interests || [],
       role: user.role,
     };
+  }
+
+  async delete(id: string, password: string) {
+    const account = await this.accountModel.findById(id);
+    if (!account) throw new NotFoundException('error.ACCOUNT_NOT_FOUND');
+    // verify password
+    const isValid = await bcrypt.compare(password, account.password);
+    if (!isValid) throw new BadRequestException('error.INVALID_PASSWORD');
+    if (account.deletedAt) throw new BadRequestException('error.ALREADY_DONE');
+    if (!account.isActive)
+      throw new BadRequestException('error.ACCOUNT_NOT_ACTIVE');
+
+    // generate otp
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // generate token
+    const token = await this.generateToken(
+      { id, credential: account.username },
+      'temporary',
+    );
+
+    // save otp and token in cache
+    this.redisService.set(account.username, token, 10);
+    this.redisService.set(account.username, otp, 10);
+
+    // send otp via credential
+    const mode: 'mail' | 'whatsapp' = this.isEmail(account.username)
+      ? 'mail'
+      : 'whatsapp';
+    const recipient = mode === 'mail' ? account.username : account.phone;
+    const res = await firstValueFrom(
+      this.messagingService.send(
+        { cmd: `send-${mode}-otp` },
+        {
+          to: recipient,
+          otp,
+        },
+      ),
+    );
+    if (res.error)
+      throw new InternalServerErrorException('error.FAILED_TO_SEND_OTP');
+
+    return {
+      message: `otp sent to ${recipient} via ${mode}.`,
+      access_token: token,
+    };
+  }
+
+  async confirmDelete(credential: string, otp: string) {
+    const data = await this.redisService.get(credential);
+    if (!data) throw new ForbiddenException('error.OTP_EXPIRED');
+    if (data !== otp) throw new BadRequestException('error.INVALID_OTP');
+
+    const account = await this.accountModel.findById({ username: credential });
+    if (!account) throw new NotFoundException('error.ACCOUNT_NOT_FOUND');
+    if (account.deletedAt) throw new BadRequestException('error.ALREADY_DONE');
+    if (!account.isActive)
+      throw new BadRequestException('error.ACCOUNT_NOT_ACTIVE');
+    await this.accountModel.findByIdAndUpdate(account._id, {
+      deletedAt: new Date(),
+    });
+
+    return { message: 'success.ACCOUNT_DELETED' };
   }
 }

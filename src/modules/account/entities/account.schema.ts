@@ -63,6 +63,9 @@ export class Account implements Omit<IAccount, 'id'> {
 
   @Prop()
   interests: string[];
+
+  @Prop({ default: null })
+  deletedAt: Date;
 }
 
 export const AccountSchema = SchemaFactory.createForClass(Account);

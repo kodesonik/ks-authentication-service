@@ -2,7 +2,6 @@ import { Controller, UseFilters } from '@nestjs/common';
 import { MessagePattern, Payload } from '@nestjs/microservices';
 import { AccountService } from './account.service';
 import { CreateAccountDto } from './dto/create-account.dto';
-import { UpdateAccountDto } from './dto/update-account.dto';
 import { SendOtpDto } from './dto/send-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { LoginDto } from './dto/login.dto';
@@ -113,30 +112,38 @@ export class AccountGateway {
   }
 
   @MessagePattern({ cmd: 'check-username' })
-  checkUsername(@Payload() createAccountDto: CreateAccountDto) {
+  async checkUsername(@Payload() checkUsernameDto: { username: string }) {
+    const exist = !(await this.accountService.isUsernameUnique(
+      checkUsernameDto.username,
+    ));
+    return { exist };
     // return this.accountService.create(createAccountDto);
   }
 
-  @MessagePattern({ cmd: 'get-accounts' })
-  getAccounts() {
-    return this.accountService.findAll();
+  @MessagePattern({ cmd: 'check-email' })
+  async checkEmail(@Payload() checkEmailDto: { email: string }) {
+    const exist = !(await this.accountService.isEmailUnique(
+      checkEmailDto.email,
+    ));
+    return { exist };
+    // return this.accountService.create(createAccountDto);
   }
 
-  @MessagePattern({ cmd: 'get-account' })
-  getAccount(@Payload() id: string) {
-    return this.accountService.findOne(+id);
-  }
-
-  @MessagePattern({ cmd: 'update-credentials' })
-  updateCredentials(
-    @Payload() id: string,
-    @Payload() updateAccountDto: UpdateAccountDto,
-  ) {
-    return this.accountService.update(+id, updateAccountDto);
+  @MessagePattern({ cmd: 'check-phone' })
+  async checkPhone(@Payload() checkPhoneDto: { phone: string }) {
+    const exist = !(await this.accountService.isPhoneUnique(
+      checkPhoneDto.phone,
+    ));
+    return { exist };
   }
 
   @MessagePattern({ cmd: 'delete-account' })
-  deleteAccount(@Payload() id: string) {
-    return this.accountService.remove(+id);
+  deleteAccount(@Payload() payload: any) {
+    return this.accountService.delete(payload.id, payload.password);
+  }
+
+  @MessagePattern({ cmd: 'confirm-delete-account' })
+  confirmDeleteAccount(@Payload() payload: any) {
+    return this.accountService.confirmDelete(payload.id, payload.otp);
   }
 }
