@@ -296,6 +296,12 @@ export class AccountService {
 
   // change email
   async changeEmail(id: string, email: string) {
+    // check if account is active
+    const account = await this.accountModel.findById(id);
+    if (!account) throw new BadRequestException('error.ACCOUNT_NOT_FOUND');
+    if (!account.isActive)
+      throw new BadRequestException('error.ACCOUNT_NOT_ACTIVE');
+
     // check if email is unique
     const isEmailUnique = await this.isEmailUnique(email);
     if (!isEmailUnique) {
@@ -303,8 +309,21 @@ export class AccountService {
     }
     // Generate otp
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    // Generate token
+    const token = await this.generateToken(
+      { ...account, id: account._id.toString() },
+      'temporary',
+    );
+
+    // save token and otp in redis
+    this.redisService.set(token, account._id.toString(), 10);
+    this.redisService.set(
+      account._id.toString(),
+      JSON.stringify({ otp, newEmail: email }),
+      10,
+    );
+
     // send otp on new email
-    this.redisService.set(email, otp, 10);
     const res = await firstValueFrom(
       this.messagingService.send(
         { cmd: 'send-mail-otp' },
@@ -314,44 +333,166 @@ export class AccountService {
         },
       ),
     );
-    console.log('res', res);
-    return { message: 'Email changed' };
+    // console.log('res', res);
+    if (res && res.error) throw new BadRequestException(res.error);
+    return {
+      message: 'success.OTP_SEND',
+      params: { email },
+      access_token: token,
+    };
   }
 
-  async confirmChangeEmail(credential: string, otp: string) {
-    // verify otp
-    const savedOtp = await this.redisService.get(credential);
-    if (!savedOtp) throw new BadRequestException('otp expired');
-    if (savedOtp !== otp) throw new BadRequestException('invalid otp');
-    // update email in redis
-    await this.accountModel.updateOne(
-      { email: credential },
-      { email: credential },
+  // change phone
+  async changePhone(id: string, phone: string) {
+    // check if phone is unique
+    const isPhoneUnique = await this.isPhoneUnique(phone);
+    if (!isPhoneUnique) {
+      throw new BadRequestException('Phone number already exist');
+    }
+
+    // check if account is active
+    const account = await this.accountModel.findById(id);
+    if (!account) throw new BadRequestException('account not found');
+    if (!account.isActive) throw new BadRequestException('account not active');
+
+    // generate otp
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    // generate token
+    const token = await this.generateToken(
+      { ...account, id: account._id.toString() },
+      'temporary',
     );
-    return { message: 'Email changed' };
+    // save token and otp in redis
+    this.redisService.set(token, account._id.toString(), 10);
+    this.redisService.set(
+      account._id.toString(),
+      JSON.stringify({ otp, newPhone: phone }),
+      10,
+    );
+
+    // send otp to new phone
+    const res = await firstValueFrom(
+      this.messagingService.send({ cmd: 'send-sms-otp' }, { to: phone, otp }),
+    );
+    if (res && res.error) throw new BadRequestException(res.error);
+    return {
+      message: 'success.OTP_SEND_TO_PHONE',
+      params: { phone },
+      access_token: token,
+    };
+  }
+
+  // confirm change email
+  async confirmChangeEmail(id: string, otp: string) {
+    // verify otp
+    const savedData = await this.redisService.get(id);
+    if (!savedData) throw new BadRequestException('otp expired');
+    const { otp: savedOtp, newEmail } = JSON.parse(savedData);
+    if (savedOtp !== otp) throw new BadRequestException('invalid otp');
+
+    // check if account is active
+    const account = await this.accountModel.findById(id);
+    if (!account) throw new BadRequestException('account not found');
+    if (!account.isActive) throw new BadRequestException('account not active');
+
+    // check if new email is unique
+    const isEmailUnique = await this.isEmailUnique(newEmail);
+    if (!isEmailUnique) {
+      throw new BadRequestException('Email already exist');
+    }
+
+    // update email in redis
+    await this.accountModel.findByIdAndUpdate(id, { email: newEmail });
+    return { message: 'success.EMAIL_CHANGED' };
+  }
+
+  // confirm change phone
+  async confirmChangePhone(id: string, otp: string) {
+    // verify otp
+    const savedData = await this.redisService.get(id);
+    if (!savedData) throw new BadRequestException('otp expired');
+    const { otp: savedOtp, newPhone } = JSON.parse(savedData);
+    if (savedOtp !== otp) throw new BadRequestException('invalid otp');
+
+    // check if account is active
+    const account = await this.accountModel.findById(id);
+    if (!account) throw new BadRequestException('account not found');
+    if (!account.isActive) throw new BadRequestException('account not active');
+
+    // update phone in redis
+    await this.accountModel.findByIdAndUpdate(id, { phone: newPhone });
+    return { message: 'success.PHONE_CHANGED' };
   }
 
   // forgot password
   async forgotPassword(credential: string) {
     // check if account with credential exist
-    
+    const account = await this.accountModel.findOne({
+      $or: [{ email: credential }, { phone: credential }],
+    });
+    if (!account) throw new BadRequestException('error.ACCOUNT_NOT_FOUND');
+    if (!account.isActive)
+      throw new BadRequestException('error.ACCOUNT_NOT_ACTIVE');
+
     // generate otp
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
     // generate token
+    const token = await this.generateToken(
+      { ...account, id: account._id.toString() },
+      'temporary',
+    );
     // save otp and token in cache
+    this.redisService.set(token, account._id.toString(), 10);
+    this.redisService.set(account._id.toString(), otp, 10);
+
     // send otp to user
+    const mode: 'mail' | 'whatsapp' = this.isEmail(credential)
+      ? 'mail'
+      : 'whatsapp';
+    const res = await firstValueFrom(
+      this.messagingService.send(
+        { cmd: `send-${mode}-otp` },
+        { to: credential, otp },
+      ),
+    );
+
+    if (res && res.error) throw new BadRequestException(res.error);
+    return {
+      message: 'success.OTP_SEND_TO_CREDENTIAL',
+      params: { credential: mode === 'mail' ? account.email : account.phone },
+      access_token: token,
+    };
   }
 
   // reset password
-  async resetPassword(credential: string, password: string) {
-    // check if account with credential exist
+  async resetPassword(id: string, password: string) {
+    // check if account is active
+    const account = await this.accountModel.findById(id);
+    if (!account) throw new BadRequestException('error.ACCOUNT_NOT_FOUND');
+    if (!account.isActive)
+      throw new BadRequestException('error.ACCOUNT_NOT_ACTIVE');
+
     // generate hash
+    const hash = await this.hashPassword(password);
     // update password
+    await this.accountModel.updateOne({ _id: id }, { password: hash });
+    return { message: 'success.PASSWORD_RESET' };
   }
 
   // change password
   async changePassword(id: string, oldPassword: string, newPassword: string) {
     // check if old password is valid
+    const account = await this.accountModel.findById(id);
+    if (!account) throw new BadRequestException('error.ACCOUNT_NOT_FOUND');
+    if (!account.isActive)
+      throw new BadRequestException('error.ACCOUNT_NOT_ACTIVE');
+    const isValid = await bcrypt.compare(oldPassword, account.password);
+    if (!isValid) throw new BadRequestException('error.INVALID_PASSWORD');
+
     // hash and save new password
+    const hash = await this.hashPassword(newPassword);
+    await this.accountModel.updateOne({ _id: id }, { password: hash });
+    return { message: 'success.PASSWORD_CHANGED' };
   }
 
   // send otp
@@ -389,6 +530,7 @@ export class AccountService {
     }
   }
 
+  // verify otp
   async verifyOtp(
     credential: string,
     otp: string,
@@ -479,6 +621,7 @@ export class AccountService {
     };
   }
 
+  // refresh token
   async refreshToken(refresh_token: string) {
     // Check if refresh token exist
     // const deviceId = await this.redisService.get(refresh_token);
@@ -513,6 +656,7 @@ export class AccountService {
     };
   }
 
+  // get profile
   async getProfile(id: string) {
     const account = await this.accountModel.findById(id).select('-password');
     if (!account) throw new BadRequestException('account not found');
@@ -524,6 +668,7 @@ export class AccountService {
     return { ...account.toObject(), id: account._id };
   }
 
+  // complete profile
   async completeProfile(id: string, createAccountDto: any) {
     const account = await this.accountModel.findById(id);
     if (!account) throw new BadRequestException('account not found');
@@ -612,14 +757,11 @@ export class AccountService {
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
     // generate token
-    const token = await this.generateToken(
-      { id, credential: account.username },
-      'temporary',
-    );
+    const token = await this.generateToken({ ...account, id }, 'temporary');
 
     // save otp and token in cache
-    this.redisService.set(account.username, token, 10);
-    this.redisService.set(account.username, otp, 10);
+    this.redisService.set(token, id, 10);
+    this.redisService.set(id, otp, 10);
 
     // send otp via credential
     const mode: 'mail' | 'whatsapp' = this.isEmail(account.username)
@@ -639,17 +781,20 @@ export class AccountService {
       throw new InternalServerErrorException('error.FAILED_TO_SEND_OTP');
 
     return {
-      message: `otp sent to ${recipient} via ${mode}.`,
+      message: 'success.OTP_SEND_TO_CREDENTIAL',
+      params: {
+        credential: mode === 'mail' ? account.username : account.phone,
+      },
       access_token: token,
     };
   }
 
-  async confirmDelete(credential: string, otp: string) {
-    const data = await this.redisService.get(credential);
+  async confirmDelete(id: string, otp: string) {
+    const data = await this.redisService.get(id);
     if (!data) throw new ForbiddenException('error.OTP_EXPIRED');
     if (data !== otp) throw new BadRequestException('error.INVALID_OTP');
 
-    const account = await this.accountModel.findById({ username: credential });
+    const account = await this.accountModel.findById(id);
     if (!account) throw new NotFoundException('error.ACCOUNT_NOT_FOUND');
     if (account.deletedAt) throw new BadRequestException('error.ALREADY_DONE');
     if (!account.isActive)

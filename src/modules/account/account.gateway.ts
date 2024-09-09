@@ -1,12 +1,16 @@
 import { Controller, UseFilters } from '@nestjs/common';
 import { MessagePattern, Payload } from '@nestjs/microservices';
 import { AccountService } from './account.service';
-import { CreateAccountDto } from './dto/create-account.dto';
-import { SendOtpDto } from './dto/send-otp.dto';
-import { VerifyOtpDto } from './dto/verify-otp.dto';
-import { LoginDto } from './dto/login.dto';
-import { RegisterDto } from './dto/register.dto';
+import {
+  SendOtpDto,
+  VerifyOtpDto,
+  LoginDto,
+  RegisterDto,
+  ForgotPasswordDto,
+  ResetPasswordDto,
+} from './dto';
 import { ExceptionFilter } from 'src/filters/rpc-exception.filter';
+import { ChangePasswordDto } from './dto/change-password.dto';
 
 @Controller()
 @UseFilters(new ExceptionFilter())
@@ -65,22 +69,67 @@ export class AccountGateway {
     }
   }
 
+  //logout
+  @MessagePattern({ cmd: 'logout' })
+  logout(@Payload() data: { token: string }) {
+    const { token } = data;
+    return this.accountService.logout(token);
+  }
+
+  //change username
+  @MessagePattern({ cmd: 'change-username' })
+  changeUsername(@Payload() data: { id: string; username: string }) {
+    const { id, username } = data;
+    return this.accountService.changeUsername(id, username);
+  }
+
+  //change email
+  @MessagePattern({ cmd: 'change-email' })
+  changeEmail(@Payload() data: { id: string; email: string }) {
+    const { id, email } = data;
+    return this.accountService.changeEmail(id, email);
+  }
+
+  //change phone
+  @MessagePattern({ cmd: 'change-phone' })
+  changePhone(@Payload() data: { id: string; phone: string }) {
+    const { id, phone } = data;
+    return this.accountService.changePhone(id, phone);
+  }
+
+  //confirm change email
+  @MessagePattern({ cmd: 'confirm-change-email' })
+  confirmChangeEmail(@Payload() data: { id: string; otp: string }) {
+    const { id, otp } = data;
+    return this.accountService.confirmChangeEmail(id, otp);
+  }
+
+  //confirm change phone
+  @MessagePattern({ cmd: 'confirm-change-phone' })
+  confirmChangePhone(@Payload() data: { id: string; otp: string }) {
+    const { id, otp } = data;
+    return this.accountService.confirmChangePhone(id, otp);
+  }
+
   //forgot password
   @MessagePattern({ cmd: 'forgot-password' })
-  forgotPassword(@Payload() createAccountDto: CreateAccountDto) {
-    // return this.accountService.create(createAccountDto);
+  forgotPassword(@Payload() forgotPasswordDto: ForgotPasswordDto) {
+    const { credential } = forgotPasswordDto;
+    return this.accountService.forgotPassword(credential);
   }
 
   //reset password
   @MessagePattern({ cmd: 'reset-password' })
-  resetPassword(@Payload() createAccountDto: CreateAccountDto) {
-    // return this.accountService.create(createAccountDto);
+  resetPassword(@Payload() resetPasswordDto: ResetPasswordDto) {
+    const { id, password } = resetPasswordDto;
+    return this.accountService.resetPassword(id, password);
   }
 
   //change password
   @MessagePattern({ cmd: 'change-password' })
-  changePassword(@Payload() createAccountDto: CreateAccountDto) {
-    // return this.accountService.create(createAccountDto);
+  changePassword(@Payload() changePasswordDto: ChangePasswordDto) {
+    const { id, oldPassword, newPassword } = changePasswordDto;
+    return this.accountService.changePassword(id, oldPassword, newPassword);
   }
 
   @MessagePattern({ cmd: 'send-otp' })
