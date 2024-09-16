@@ -241,14 +241,14 @@ export class AccountService {
       this.redisService.delete(account.email);
 
       // Generate wallet
-      const res = await firstValueFrom(
-        this.transactionService.send(
-          { cmd: 'create-wallet' },
-          { accountId: account._id },
-        ),
-      );
+      // const res = await firstValueFrom(
+      //   this.transactionService.send(
+      //     { cmd: 'create-wallet' },
+      //     { accountId: account._id },
+      //   ),
+      // );
 
-      if (res && res.error) throw new BadRequestException(res.error);
+      // if (res && res.error) throw new BadRequestException(res.error);
 
       // Reward referrer
       // if (account.referredBy) {
