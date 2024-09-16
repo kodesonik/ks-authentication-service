@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { HydratedDocument } from 'mongoose';
+import mongoose, { HydratedDocument } from 'mongoose';
 import { AuthMethod, Gender, Role } from 'src/models';
 import IAccount from 'src/models/account';
 
@@ -73,8 +73,8 @@ export class Account implements Omit<IAccount, 'id'> {
   @Prop({ default: null })
   referralCode: string;
 
-  @Prop({ default: null, ref: 'Account' })
-  referredBy: any;
+  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Account', default: null })
+  referredBy: mongoose.Schema.Types.ObjectId;
 }
 
 export const AccountSchema = SchemaFactory.createForClass(Account);
