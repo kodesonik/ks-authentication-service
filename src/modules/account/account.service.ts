@@ -310,8 +310,8 @@ export class AccountService {
       // check if account with userId exist
       const account = await this.accountModel.findById(userId);
       if (!account) throw new BadRequestException('account not found');
-      if (account.isActive)
-        throw new BadRequestException('account already active');
+      // if (account.isActive)
+        // throw new BadRequestException('account already active');
       if (account.confirmedAt)
         throw new BadRequestException('account already confirmed');
 
