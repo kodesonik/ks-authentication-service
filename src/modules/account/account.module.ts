@@ -86,6 +86,14 @@ import { ClientProxyFactory } from '@nestjs/microservices';
       },
       inject: [ConfigService],
     },
+    {
+      provide: 'TRANSACTION_SERVICE',
+      useFactory: (configService: ConfigService) => {
+        const serviceOptions = configService.get('transactionService');
+        return ClientProxyFactory.create(serviceOptions);
+      },
+      inject: [ConfigService],
+    },
   ],
 })
 export class AccountModule {}

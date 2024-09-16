@@ -32,6 +32,8 @@ export class AccountService {
     @Inject('MESSAGING_SERVICE')
     private readonly messagingService: ClientProxy,
     @Inject('BACKUP_SERVICE') private readonly backupService: ClientProxy,
+    @Inject('TRANSACTION_SERVICE')
+    private readonly transactionService: ClientProxy,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
   ) {}
@@ -63,6 +65,22 @@ export class AccountService {
     const response = await this.accountModel.findOne({ phone });
 
     return !response;
+  }
+
+  async isReferralCodeUnique(referralCode: string): Promise<boolean> {
+    //Check if the referralCode provide is unique
+    const response = await this.accountModel.findOne({ referralCode });
+    return !response;
+  }
+
+  async generateReferralCode(username: string): Promise<string> {
+    const code = username.slice(0, 3).toUpperCase();
+    const randomString = Math.random().toString(36).slice(2, 10);
+    const referralCode = `${code}${randomString}`;
+    if (!(await this.isReferralCodeUnique(referralCode))) {
+      return this.generateReferralCode(username);
+    }
+    return referralCode;
   }
 
   private async generateToken(
@@ -137,13 +155,27 @@ export class AccountService {
       // hash password
       Logger.log(registerDto);
       registerDto.password = await this.hashPassword(registerDto.password);
+      // generate referral code
+      const referralCode = await this.generateReferralCode(
+        registerDto.username,
+      );
+
+      // Find referrer
+      let referrer: any;
+      if (registerDto.referralCode) {
+        referrer = await this.accountModel.findOne({
+          referralCode: registerDto.referralCode,
+        });
+      }
 
       // save user in database
       const account = await this.accountModel.create({
         ...registerDto,
         isActive: false,
+        referralCode,
+        referredBy: referrer?._id || null,
       });
-      Logger.log(account);
+      // Logger.log(account);
 
       // generate tokens
       const { _id, ...rest } = account.toObject();
@@ -196,24 +228,68 @@ export class AccountService {
       if (!account) throw new BadRequestException('account not found');
       if (account.isActive)
         throw new BadRequestException('account already active');
+
+      if (account.confirmedAt)
+        throw new BadRequestException('account already confirmed');
       // compare otp
       const isValid = await this.redisService.get(account.email);
       if (!isValid) throw new BadRequestException('invalid otp');
       if (isValid !== otp) throw new BadRequestException('invalid otp');
       // activate account
-      await account.updateOne({ isActive: true });
+      await account.updateOne({ isActive: true, confirmedAt: new Date() });
       // remove otp from redis
       this.redisService.delete(account.email);
 
+      // Generate wallet
+      const res = await firstValueFrom(
+        this.transactionService.send(
+          { cmd: 'create-wallet' },
+          { accountId: account._id },
+        ),
+      );
+
+      if (res && res.error) throw new BadRequestException(res.error);
+
+      // Reward referrer
+      // if (account.referredBy) {
+      //   const referrer = await this.accountModel.findOne({
+      //     referralCode: account.referredBy,
+      //   });
+      //   if (referrer) {
+      //     await this.transactionService.send(
+      //       { cmd: 'create-transaction' },
+      //       {
+      //         accountId: referrer._id,
+      //         amount: this.configService.get('referral.referrerReward'),
+      //         type: this.configService.get('referral.rewardType'),
+      //       },
+      //     );
+      //     if (this.configService.get('referral.referredReward') > 0)
+      //       await this.transactionService.send(
+      //         { cmd: 'create-transaction' },
+      //         {
+      //           accountId: account._id,
+      //           amount: this.configService.get('referral.referredReward'),
+      //           type: this.configService.get('referral.rewardType'),
+      //         },
+      //       );
+      //   }
+      // }
       // generate tokens
       const { _id, ...rest } = account.toObject();
       const access_token = await this.generateToken(
-        { id: _id, _id, ...rest, isActive: true },
+        { id: _id, _id, ...rest, isActive: true, confirmedAt: new Date() },
         'access',
       );
 
       const refresh_token = await this.generateToken(
-        { id: _id, _id, ...rest, isActive: true },
+        {
+          id: _id,
+          _id,
+          ...rest,
+          isActive: true,
+          confirmedAt: new Date(),
+        },
         'refresh',
       );
       return {
@@ -228,6 +304,46 @@ export class AccountService {
     }
   }
 
+  // resend confirmation account code
+  async resendConfirmationAccountCode(userId: string) {
+    try {
+      // check if account with userId exist
+      const account = await this.accountModel.findById(userId);
+      if (!account) throw new BadRequestException('account not found');
+      if (account.isActive)
+        throw new BadRequestException('account already active');
+      if (account.confirmedAt)
+        throw new BadRequestException('account already confirmed');
+
+      // generate token
+      const token = await this.generateToken(
+        { id: account._id, ...account.toObject() },
+        'temporary',
+      );
+
+      // generate otp
+      const otp = Math.floor(100000 + Math.random() * 900000).toString();
+      // save otp in redis
+      this.redisService.set(account.email, otp, 10);
+      // send otp to email
+      const res = await firstValueFrom(
+        this.messagingService.send(
+          { cmd: 'send-mail-otp' },
+          { to: account.email, otp },
+        ),
+      );
+      console.log('res', res);
+      return {
+        message: 'success.OTP_SEND_TO_CREDENTIAL',
+        params: { credential: account.email },
+        access_token: token,
+      };
+    } catch (error) {
+      Logger.error(error.message, 'ResendConfirmationAccountCode');
+      return { error: error.message, status: error.status };
+    }
+  }
+
   // login
   async login(loginDto: LoginDto) {
     try {
@@ -235,9 +351,12 @@ export class AccountService {
       const account = await this.accountModel.findOne({
         $or: [{ email: loginDto.username }, { username: loginDto.username }],
       });
-      if (!account) throw new BadRequestException('account not found');
+      if (!account) throw new BadRequestException('account.NOT_FOUND');
       if (!account.isActive)
-        throw new BadRequestException('account not active');
+        throw new BadRequestException('account.NOT_ACTIVE');
+
+      if (!account.confirmedAt)
+        return this.resendConfirmationAccountCode(account._id?.toString());
       // compare password
       const isValid = await bcrypt.compare(loginDto.password, account.password);
       if (!isValid) throw new BadRequestException('invalid password');

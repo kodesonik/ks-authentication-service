@@ -43,6 +43,13 @@ export default () => ({
     },
     transport: Transport.TCP,
   },
+  transactionService: {
+    options: {
+      host: process.env.TRANSACTION_SERVICE_HOST,
+      port: process.env.TRANSACTION_SERVICE_PORT,
+    },
+    transport: Transport.TCP,
+  },
   backupService: {
     options: {
       host: process.env.BACKUP_SERVICE_HOST,
@@ -56,5 +63,11 @@ export default () => ({
     username: process.env.ROOT_USERNAME,
     email: process.env.ROOT_EMAIL,
     phone: parseInt(process.env.ROOT_PHONE, 10),
+  },
+  referral: {
+    referrerReward: parseInt(process.env.REFERRER_REWARD, 10) || 100,
+    referredReward: parseInt(process.env.REFERRED_REWARD, 10) || 50,
+    referrerRewardType: process.env.REFERRER_REWARD_TYPE || 'points',
+    referredRewardType: process.env.REFERRED_REWARD_TYPE || 'points',
   },
 });

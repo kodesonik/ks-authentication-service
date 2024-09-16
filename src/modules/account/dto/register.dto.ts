@@ -59,4 +59,8 @@ export class RegisterDto {
   @IsString()
   @IsOptional()
   address: string;
+
+  @IsString()
+  @IsOptional()
+  referralCode: string;
 }

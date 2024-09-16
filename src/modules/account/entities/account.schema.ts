@@ -66,6 +66,15 @@ export class Account implements Omit<IAccount, 'id'> {
 
   @Prop({ default: null })
   deletedAt: Date;
+
+  @Prop({ default: null })
+  confirmedAt: Date;
+
+  @Prop({ default: null })
+  referralCode: string;
+
+  @Prop({ default: null, ref: 'Account' })
+  referredBy: any;
 }
 
 export const AccountSchema = SchemaFactory.createForClass(Account);

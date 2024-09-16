@@ -58,6 +58,13 @@ export class AccountGateway {
     return this.accountService.confirmAccount(user.id, otp);
   }
 
+  // resend confirmation account code
+  @MessagePattern({ cmd: 'resend-confirmation-code' })
+  resendConfirmationAccountCode(@Payload() data: { userId: string }) {
+    const { userId } = data;
+    return this.accountService.resendConfirmationAccountCode(userId);
+  }
+
   //login
   @MessagePattern({ cmd: 'login' })
   login(@Payload() loginDto: LoginDto) {

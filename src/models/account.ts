@@ -17,4 +17,7 @@ export default interface IAccount {
   isActive: boolean;
   completed: boolean;
   lastLogin: Date;
+  confirmedAt: Date;
+  referralCode: string;
+  referredBy: any;
 }
