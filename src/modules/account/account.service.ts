@@ -241,14 +241,14 @@ export class AccountService {
       this.redisService.delete(account.email);
 
       // Generate wallet
-      // const res = await firstValueFrom(
-      //   this.transactionService.send(
-      //     { cmd: 'create-wallet' },
-      //     { accountId: account._id },
-      //   ),
-      // );
+      const res = await firstValueFrom(
+        this.transactionService.send(
+          { cmd: 'create-wallet' },
+          { owner: account._id.toString() },
+        ),
+      );
 
-      // if (res && res.error) throw new BadRequestException(res.error);
+      if (res && res.error) throw new BadRequestException(res.error);
 
       // Reward referrer
       // if (account.referredBy) {
@@ -257,18 +257,18 @@ export class AccountService {
       //   });
       //   if (referrer) {
       //     await this.transactionService.send(
-      //       { cmd: 'create-transaction' },
+      //       { cmd: 'create-operation' },
       //       {
-      //         accountId: referrer._id,
+      //         beneficiary: referrer._id.toString(),
       //         amount: this.configService.get('referral.referrerReward'),
       //         type: this.configService.get('referral.rewardType'),
       //       },
       //     );
       //     if (this.configService.get('referral.referredReward') > 0)
       //       await this.transactionService.send(
-      //         { cmd: 'create-transaction' },
+      //         { cmd: 'create-operation' },
       //         {
-      //           accountId: account._id,
+      //           beneficiary: account._id.toString(),
       //           amount: this.configService.get('referral.referredReward'),
       //           type: this.configService.get('referral.rewardType'),
       //         },
